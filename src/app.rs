@@ -29,6 +29,8 @@ pub struct WalletApp {
     #[serde(skip)]
     mnemonic: String,
     #[serde(skip)]
+    passphrase: String,
+    #[serde(skip)]
     amount: u64,
     #[serde(skip)]
     show: bool,
@@ -50,11 +52,10 @@ impl Default for WalletApp {
         //         .unwrap();
         // let _mnemonic = mnemonic.into_key();
         let phrase = "all all all all all all all all all all all all".to_string();
+        let passphrase = "cKwshpAqpkxtfxHXFRGLsnfqHWViDu".to_string();
+
         let mnemonic: Mnemonic = phrase.parse().unwrap();
-        let xkey: ExtendedKey = (
-            mnemonic.clone(),
-            Some("cKwshpAqpkxtfxHXFRGLsnfqHWViDu".to_string()),
-        )
+        let xkey: ExtendedKey = (mnemonic.clone(), Some(passphrase.clone()))
             .into_extended_key()
             .unwrap();
         let xprv = xkey
@@ -63,10 +64,7 @@ impl Default for WalletApp {
                 Error::Generic("Privatekey info not found (should not happen)".to_string())
             })
             .unwrap();
-        let xkey: ExtendedKey = (
-            mnemonic.clone(),
-            Some("cKwshpAqpkxtfxHXFRGLsnfqHWViDu".to_string()),
-        )
+        let xkey: ExtendedKey = (mnemonic.clone(), Some(passphrase.clone()))
             .into_extended_key()
             .unwrap();
         let _xpub = xkey.into_xpub(bdk::bitcoin::Network::Testnet, &secp);
@@ -95,7 +93,10 @@ impl Default for WalletApp {
         )
         .unwrap();
         let wallet = Rc::new(wallet);
-        let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+        let client = match Client::new("ssl://electrum.blockstream.info:60002") {
+            Ok(c) => c,
+            Err(e) => panic!("Connect to the internet {}", e),
+        };
         let blockchain = ElectrumBlockchain::from(client);
         wallet.sync(&blockchain, SyncOptions::default()).unwrap();
         let spendable = wallet.get_balance().unwrap().get_spendable();
@@ -103,6 +104,7 @@ impl Default for WalletApp {
         Self {
             image: RetainedImage::from_image_bytes("default self", qr.as_slice()).unwrap(),
             mnemonic: phrase,
+            passphrase: passphrase,
             address: String::new(),
             wallet: wallet,
             amount: 1000,
@@ -126,6 +128,7 @@ impl WalletApp {
         Self {
             image: image,
             address: self.address.clone(),
+            passphrase: self.passphrase.clone(),
             mnemonic: self.mnemonic.clone(),
             wallet: self.wallet.clone(),
             amount: self.amount.clone(),
@@ -232,13 +235,14 @@ impl eframe::App for WalletApp {
                     });
                     ui.end_row();
                 });
-                egui::Window::new("Mnemonic")
-                    .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(0., 0.))
+                egui::Window::new("BIP39 Secret")
+                    .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(0., 0.))
                     .open(&mut true)
                     .collapsible(true)
                     .show(ctx, |ui| {
                         ui.vertical_centered_justified(|ui| {
                             ui.text_edit_singleline(&mut self.mnemonic);
+                            ui.text_edit_singleline(&mut self.passphrase);
                         });
                     });
             });

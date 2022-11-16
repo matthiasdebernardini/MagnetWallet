@@ -9,7 +9,7 @@ fn main() {
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "eframe template",
+        "Best Test Wallet",
         native_options,
         Box::new(|cc| Box::new(best_test_wallet::WalletApp::new(cc))),
     );
