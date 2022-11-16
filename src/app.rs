@@ -153,10 +153,10 @@ impl eframe::App for WalletApp {
                     ui.vertical_centered_justified(|ui| {
                         ui.heading("Send");
                         ui.label(format!(
-                            "spendable: {} sats",
+                            "Spendable: {} Sats",
                             self.spendable.to_formatted_string(&Locale::en).to_string()
                         ));
-                        if ui.button("sync wallet to blockchain").clicked() {
+                        if ui.button("Sync Wallet To Blockchain").clicked() {
                             let client =
                                 Client::new("ssl://electrum.blockstream.info:60002").unwrap();
                             let blockchain = ElectrumBlockchain::from(client);
@@ -165,23 +165,23 @@ impl eframe::App for WalletApp {
                                 .unwrap();
                             self.spendable = self.wallet.get_balance().unwrap().get_spendable();
                             println!(
-                                "spendable {} sats",
+                                "Spendable {} Sats",
                                 self.spendable.to_formatted_string(&Locale::en)
                             );
                         }
-                        ui.label("amount");
+                        ui.label("Amount");
                         let min = 600 as u64;
                         let s =
-                            egui::Slider::new(&mut self.amount, min..=self.spendable).text("sats");
+                            egui::Slider::new(&mut self.amount, min..=self.spendable).text("Sats");
                         ui.add(s);
-                        ui.label("send sats to");
+                        ui.label("Send Sats To");
                         ui.text_edit_singleline(&mut self.send_to);
-                        if ui.button("make tx").clicked() {
+                        if ui.button("Make TX").clicked() {
                             self.show_send = true;
                         }
                         if self.show_send {
                             egui::Window::new("Send?").show(ctx, |ui| {
-                                println!("amount {}", self.amount);
+                                println!("Amount {}", self.amount);
                                 let send_to: Address = self.send_to.clone().parse().unwrap();
                                 let mut builder = self.wallet.build_tx();
                                 let (mut psbt, _details) = {
@@ -257,12 +257,12 @@ impl eframe::App for WalletApp {
                             .map(|t| t.height)
                             .cmp(&a.confirmation_time.as_ref().map(|t| t.height))
                     });
-                    egui::Grid::new("tx history").striped(true).show(ui, |ui| {
-                        ui.label("txid");
-                        ui.label("sats received");
-                        ui.label("sats sent");
-                        ui.label("fee");
-                        ui.label("date");
+                    egui::Grid::new("TX History").striped(true).show(ui, |ui| {
+                        ui.label("TXID");
+                        ui.label("Sats Received");
+                        ui.label("Sats Sent");
+                        ui.label("Fee");
+                        ui.label("Date");
                         ui.end_row();
                         txs.iter().for_each(|tx| {
                             let txid = tx.txid.to_string();
