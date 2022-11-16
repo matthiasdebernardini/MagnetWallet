@@ -11,7 +11,7 @@ fn main() {
     eframe::run_native(
         "eframe template",
         native_options,
-        Box::new(|cc| Box::new(eframe_template::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(best_test_wallet::WalletApp::new(cc))),
     );
 }
 
@@ -28,7 +28,7 @@ fn main() {
     eframe::start_web(
         "the_canvas_id", // hardcode it
         web_options,
-        Box::new(|cc| Box::new(eframe_template::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(best_test_wallet::WalletApp::new(cc))),
     )
     .expect("failed to start eframe");
 }
