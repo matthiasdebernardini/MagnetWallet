@@ -1,5 +1,5 @@
 [package]
-name = "best_test_wallet"
+name = "magnet-wallet"
 version = "0.0.1"
 authors = ["Matthias Debernardini <matthias.debernardini@gmail.com>"]
 edition = "2021"
