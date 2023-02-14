@@ -4,7 +4,7 @@ A bitcoin wallet meant for testing.
 
 Magnet Wallet can be used to troubleshoot other wallets (assuming theres no bugs!).
 
-How to run:
+## How to run
 
 clone repo then inside the directory run;
 
