@@ -1,8 +1,8 @@
 # Magnet Wallet
 
-A bitcoin wallet that works with alternative bitcoin networks for the purpose of trying things out with as low opportunity cost possible
+A bitcoin wallet meant for testing.
 
-Can be used to troubleshoot other wallets (assuming theres no bugs!) 
+Magnet Wallet can be used to troubleshoot other wallets (assuming theres no bugs!).
 
 How to run:
 
