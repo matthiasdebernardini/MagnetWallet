@@ -9,9 +9,9 @@ fn main() {
 
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
-        "Best Test Wallet",
+        "MagnetWallet",
         native_options,
-        Box::new(|cc| Box::new(best_test_wallet::WalletApp::new(cc))),
+        Box::new(|cc| Box::new(MagnetWallet::WalletApp::new(cc))),
     );
 }
 

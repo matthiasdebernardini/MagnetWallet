@@ -3,6 +3,25 @@
 version = 3
 
 [[package]]
+name = "MagnetWallet"
+version = "0.0.1"
+dependencies = [
+ "bdk",
+ "chrono",
+ "console_error_panic_hook",
+ "eframe",
+ "egui",
+ "egui-notify",
+ "egui_extras",
+ "image",
+ "num-format",
+ "qrcode-generator",
+ "serde",
+ "tracing-subscriber",
+ "tracing-wasm",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -174,25 +193,6 @@ name = "bech32"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf9ff0bbfd639f15c74af777d81383cf53efb7c93613f6cab67c6c11e05bbf8b"
-
-[[package]]
-name = "best_test_wallet"
-version = "0.0.1"
-dependencies = [
- "bdk",
- "chrono",
- "console_error_panic_hook",
- "eframe",
- "egui",
- "egui-notify",
- "egui_extras",
- "image",
- "num-format",
- "qrcode-generator",
- "serde",
- "tracing-subscriber",
- "tracing-wasm",
-]
 
 [[package]]
 name = "bip39"
