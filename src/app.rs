@@ -10,12 +10,14 @@ use bdk::keys::ExtendedKey;
 use bdk::wallet::AddressIndex::New;
 use bdk::{Error, FeeRate, SignOptions, SyncOptions, Wallet};
 use chrono::NaiveDateTime;
+use egui::Visuals;
 use egui_extras::RetainedImage;
+use egui_notify::{Toast, Toasts};
 use num_format::{Locale, ToFormattedString};
 use qrcode_generator::QrCodeEcc;
 use std::rc::Rc;
 use std::str::FromStr;
-// use liquid_rpc::*;
+use std::time::Duration;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -24,6 +26,8 @@ pub struct WalletApp {
     image: RetainedImage,
     #[serde(skip)]
     address: String,
+    #[serde(skip)]
+    derivation_path: String,
     #[serde(skip)]
     send_to: String,
     #[serde(skip)]
@@ -38,22 +42,24 @@ pub struct WalletApp {
     wallet: Rc<Wallet<AnyDatabase>>,
     #[serde(skip)]
     show_send: bool,
+    #[serde(skip)]
+    show_new_wallet: bool,
     spendable: u64,
+    #[serde(skip)]
+    toasts: Toasts,
+    caption: String,
+    closable: bool,
+    expires: bool,
+    duration: f32,
+    dark: bool,
+    electrum_client: String,
 }
 
 impl Default for WalletApp {
     fn default() -> Self {
-        // let c = liquid_rpc::CLient::newQ;
-
         let secp = Secp256k1::new();
-        // let mnemonic: GeneratedKey<_, miniscript::BareCtx> =
-        //     Mnemonic::generate((WordCount::Words12, Language::English))
-        //         .map_err(|_| bdk::Error::Generic("Mnemonic generation error".to_string()))
-        //         .unwrap();
-        // let _mnemonic = mnemonic.into_key();
         let phrase = "all all all all all all all all all all all all".to_string();
         let passphrase = "cKwshpAqpkxtfxHXFRGLsnfqHWViDu".to_string();
-
         let mnemonic: Mnemonic = phrase.parse().unwrap();
         let xkey: ExtendedKey = (mnemonic.clone(), Some(passphrase.clone()))
             .into_extended_key()
@@ -68,11 +74,6 @@ impl Default for WalletApp {
             .into_extended_key()
             .unwrap();
         let _xpub = xkey.into_xpub(bdk::bitcoin::Network::Testnet, &secp);
-        let phrase = mnemonic
-            .word_iter()
-            .fold("".to_string(), |phrase, w| phrase + w + " ")
-            .trim()
-            .to_string();
         let coin_type = 1;
         let base_path = DerivationPath::from_str("m/84'").unwrap();
         let account_number = 0;
@@ -80,11 +81,18 @@ impl Default for WalletApp {
             ChildNumber::from_hardened_idx(coin_type).unwrap(),
             ChildNumber::from_hardened_idx(account_number).unwrap(),
         ]);
+        // let _derivation_path = derivation_path.clone();
         let descriptor = bdk::descriptor!(wpkh((
             xprv,
             derivation_path.extend(&[ChildNumber::Normal { index: 0 }])
         )))
         .unwrap();
+        let mut _derivation_path = String::new();
+        let _ = descriptor
+            .1
+            .iter()
+            .for_each(|(a, _)| _derivation_path = a.full_derivation_path().to_string().clone());
+        // println!("descriptor {:?}", descriptor.1);
         let wallet = Wallet::new(
             descriptor,
             None,
@@ -93,25 +101,34 @@ impl Default for WalletApp {
         )
         .unwrap();
         let wallet = Rc::new(wallet);
-        let client = match Client::new("ssl://electrum.blockstream.info:60002") {
-            Ok(c) => c,
-            Err(e) => panic!("Connect to the internet {}", e),
-        };
-        let blockchain = ElectrumBlockchain::from(client);
-        wallet.sync(&blockchain, SyncOptions::default()).unwrap();
-        let spendable = wallet.get_balance().unwrap().get_spendable();
+        // let client = match Client::new("ssl://electrum.blockstream.info:60002") {
+        //     Ok(c) => c,
+        //     Err(e) => panic!("Connect to the internet {}", e),
+        // };
+        // let blockchain = ElectrumBlockchain::from(client);
+        // wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+        // let spendable = wallet.get_balance().unwrap().get_spendable();
         let qr = qrcode_generator::to_png_to_vec("", QrCodeEcc::Medium, 300).unwrap();
         Self {
             image: RetainedImage::from_image_bytes("default self", qr.as_slice()).unwrap(),
-            mnemonic: phrase,
-            passphrase: passphrase,
+            mnemonic: "all all all all all all all all all all all all".to_string(),
+            derivation_path: _derivation_path,
+            passphrase: "cKwshpAqpkxtfxHXFRGLsnfqHWViDu".to_string(),
             address: String::new(),
             wallet: wallet,
             amount: 1000,
             show: false,
             send_to: String::new(),
             show_send: false,
-            spendable: spendable,
+            show_new_wallet: false,
+            spendable: 0,
+            toasts: Toasts::default(),
+            caption: "arst".to_string(),
+            closable: true,
+            expires: false,
+            duration: 109.,
+            dark: false,
+            electrum_client: "ssl://electrum.blockstream.info:60002".to_string(),
         }
     }
 }
@@ -128,6 +145,7 @@ impl WalletApp {
         Self {
             image: image,
             address: self.address.clone(),
+            derivation_path: self.derivation_path.clone(),
             passphrase: self.passphrase.clone(),
             mnemonic: self.mnemonic.clone(),
             wallet: self.wallet.clone(),
@@ -135,7 +153,15 @@ impl WalletApp {
             show: self.show,
             send_to: self.send_to.clone(),
             show_send: self.show_send,
+            show_new_wallet: self.show_new_wallet,
             spendable: self.spendable,
+            toasts: Toasts::default(),
+            caption: self.caption.clone(),
+            closable: self.closable,
+            expires: self.expires,
+            duration: self.duration,
+            dark: self.dark,
+            electrum_client: self.electrum_client.clone(),
         }
     }
 }
@@ -149,6 +175,14 @@ impl eframe::App for WalletApp {
         egui::SidePanel::left("id_source")
             .default_width(350.)
             .show(ctx, |ui| {
+                // let customize_toast = |t: &mut Toast| {
+                //     let duration = if self.expires {
+                //         Some(Duration::from_millis((1000. * self.duration) as u64))
+                //     } else {
+                //         None
+                //     };
+                //     t.set_closable(self.closable).set_duration(duration);
+                // };
                 egui::TopBottomPanel::top("send_receive").show_inside(ui, |ui| {
                     ui.vertical_centered_justified(|ui| {
                         ui.heading("Send");
@@ -158,16 +192,12 @@ impl eframe::App for WalletApp {
                         ));
                         if ui.button("Sync Wallet To Blockchain").clicked() {
                             let client =
-                                Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+                                Client::new(&self.electrum_client).unwrap();
                             let blockchain = ElectrumBlockchain::from(client);
                             self.wallet
                                 .sync(&blockchain, SyncOptions::default())
                                 .unwrap();
                             self.spendable = self.wallet.get_balance().unwrap().get_spendable();
-                            println!(
-                                "Spendable {} Sats",
-                                self.spendable.to_formatted_string(&Locale::en)
-                            );
                         }
                         ui.label("Amount");
                         let min = 600 as u64;
@@ -181,24 +211,40 @@ impl eframe::App for WalletApp {
                         }
                         if self.show_send {
                             egui::Window::new("Send?").show(ctx, |ui| {
-                                println!("Amount {}", self.amount);
-                                let send_to: Address = self.send_to.clone().parse().unwrap();
-                                let mut builder = self.wallet.build_tx();
-                                let (mut psbt, _details) = {
-                                    builder
-                                        .add_recipient(send_to.script_pubkey(), self.amount)
-                                        .fee_rate(FeeRate::from_sat_per_vb(5.0));
-                                    builder.finish().unwrap()
-                                };
-                                ui.label(psbt.to_string());
-                                if ui.button("Send?").clicked() {
+                                let text =
+                                    format!("{} sats to {}", self.amount, self.send_to.clone());
+                                ui.label(text);
+                                if ui.button("Yes").double_clicked() {
+                                    let send_to: Address = self.send_to.clone().parse().unwrap();
+                                    let mut builder = self.wallet.build_tx();
+                                    let (mut psbt, _details) = {
+                                        builder
+                                            .add_recipient(send_to.script_pubkey(), self.amount)
+                                            .fee_rate(FeeRate::from_sat_per_vb(5.0));
+                                        builder.finish().unwrap()
+                                    };
                                     self.wallet.sign(&mut psbt, SignOptions::default()).unwrap();
-                                    println!("{}", psbt.clone().extract_tx().txid());
                                     let client =
-                                        Client::new("ssl://electrum.blockstream.info:60002")
+                                        Client::new(&self.electrum_client)
                                             .unwrap();
                                     let blockchain = ElectrumBlockchain::from(client);
+                                    let txid = &psbt.clone().extract_tx().txid();
                                     blockchain.broadcast(&psbt.extract_tx()).unwrap();
+                                    self.caption = txid.to_string();
+                                    let customize_toast = |t: &mut Toast| {
+                                        let duration = if self.expires {
+                                            Some(Duration::from_millis(
+                                                (1000000. * self.duration) as u64,
+                                            ))
+                                        } else {
+                                            None
+                                        };
+                                        t.set_closable(self.closable).set_duration(duration);
+                                    };
+                                    customize_toast(self.toasts.success(self.caption.clone()));
+                                    self.show_send = false;
+                                }
+                                if ui.button("No").clicked() {
                                     self.show_send = false;
                                 }
                             });
@@ -243,10 +289,113 @@ impl eframe::App for WalletApp {
                         ui.vertical_centered_justified(|ui| {
                             ui.text_edit_singleline(&mut self.mnemonic);
                             ui.text_edit_singleline(&mut self.passphrase);
+                            ui.text_edit_singleline(&mut self.derivation_path);
+                            if ui.button("Remake wallet").double_clicked() {
+                                self.show_new_wallet = true;
+                            }
+                            if self.show_new_wallet {
+                                egui::Window::new("New Wallet").show(ctx, |ui| {
+                                    let text = format!(
+                                        "{} {} {}",
+                                        self.mnemonic.clone(),
+                                        self.passphrase.clone(),
+                                        self.derivation_path.clone()
+                                    );
+                                    ui.label(text);
+                                    if ui.button("Confirm").double_clicked() {
+                                        let secp = Secp256k1::new();
+                                        let mnemonic: Mnemonic = self.mnemonic.parse().unwrap();
+                                        let xkey: ExtendedKey =
+                                            (mnemonic.clone(), Some(self.passphrase.clone()))
+                                                .into_extended_key()
+                                                .unwrap();
+                                        let xprv = xkey
+                                            .into_xprv(bdk::bitcoin::Network::Testnet)
+                                            .ok_or_else(|| {
+                                                Error::Generic(
+                                                    "Privatekey info not found (should not happen)"
+                                                        .to_string(),
+                                                )
+                                            })
+                                            .unwrap();
+                                        let xkey: ExtendedKey =
+                                            (mnemonic.clone(), Some(self.passphrase.clone()))
+                                                .into_extended_key()
+                                                .unwrap();
+                                        let _xpub =
+                                            xkey.into_xpub(bdk::bitcoin::Network::Testnet, &secp);
+                                        let derivation_path =
+                                            DerivationPath::from_str(self.derivation_path.as_str())
+                                                .unwrap();
+                                        let descriptor = bdk::descriptor!(wpkh((
+                                            xprv,
+                                            derivation_path // .extend(&[ChildNumber::Normal { index: 0 }])
+                                        )))
+                                        .unwrap();
+                                        let mut _derivation_path = String::new();
+                                        let _ = descriptor.1.iter().for_each(|(descriptor, _)| {
+                                            _derivation_path = descriptor
+                                                .full_derivation_path()
+                                                .to_string()
+                                                .clone()
+                                        });
+                                        // println!("descriptor {:?}", descriptor.1);
+                                        let wallet = Wallet::new(
+                                            descriptor,
+                                            None,
+                                            bdk::bitcoin::Network::Testnet,
+                                            AnyDatabase::Memory(MemoryDatabase::new()),
+                                        )
+                                        .unwrap();
+                                        let wallet = Rc::new(wallet);
+                                        self.wallet = wallet;
+                                        // let client = match Client::new("ssl://electrum.blockstream.info:60002") {
+                                        //     Ok(c) => c,
+                                        //     Err(e) => panic!("Connect to the internet {}", e),
+                                        // };
+                                        // let blockchain = ElectrumBlockchain::from(client);
+                                        // wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+                                        // let spendable = wallet.get_balance().unwrap().get_spendable();
+
+                                        self.show_new_wallet = false;
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_new_wallet = false;
+                                    }
+                                });
+                            };
+                        });
+                    });
+                egui::Window::new("Network")
+                    .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-300., 0.))
+                    .open(&mut true)
+                    .collapsible(true)
+                    .show(ctx, |ui| {
+                        ui.vertical_centered_justified(|ui| {
+                            ui.text_edit_singleline(&mut self.electrum_client);
+                            if ui.button("Reconnect to a new network").double_clicked() {
+                                self.show_new_wallet = true;
+                            }
+                           
                         });
                     });
             });
         egui::CentralPanel::default().show(ctx, |ui| {
+            let customize_toast = |t: &mut Toast| {
+                let duration = if self.expires {
+                    Some(Duration::from_millis((1000. * self.duration) as u64))
+                } else {
+                    None
+                };
+                t.set_closable(self.closable).set_duration(duration);
+            };
+
+      
+            if ui.button("Dismiss and Copy txid").clicked() {
+                self.toasts.dismiss_all_toasts();
+                ui.output().copied_text = self.caption.clone();
+            }
+
             ui.group(|ui| {
                 ui.vertical_centered_justified(|ui| {
                     ui.heading("History");
@@ -300,5 +449,6 @@ impl eframe::App for WalletApp {
                 });
             });
         });
+        self.toasts.show(ctx);
     }
 }
